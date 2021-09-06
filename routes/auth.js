@@ -10,7 +10,7 @@ const { SECRET_KEY } = require('../config')
  * Make sure to update their last-login!
  *
  **/
-router.post('/login', (req, res, next) => {
+router.post('/login', async (req, res, next) => {
   try {
     const { username, password } = req.body
     if(await User.authenticate(username, password)) {
@@ -31,7 +31,7 @@ router.post('/login', (req, res, next) => {
  *
  *  Make sure to update their last-login!
  */
-router.post('/register', (req, res, next) => {
+router.post('/register', async (req, res, next) => {
   try {
     const { username } = await User.register(req.body)
     const token = jwt.sign({username}, SECRET_KEY)
