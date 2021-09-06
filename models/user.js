@@ -1,6 +1,8 @@
 /** User class for message.ly */
 const db = require('../db')
 const ExpressError = require('../expressError')
+const bcrypt = require('bcrypt')
+const { BCRYPT_WORK_FACTOR } = require('../config')
 
 
 /** User of the site. */
@@ -12,11 +14,12 @@ class User {
    */
 
   static async register({ username, password, first_name, last_name, phone }) {
+    let hashedPassword = await bcrypt.hash(password, BCRYPT_WORK_FACTOR)
     const result = await db.query(`
       INSERT INTO users ( username, password, first_name, last_name, phone, join_at, last_login_at )
       VALUES ( $1, $2, $3, $4, $5, current_timestamp, current_timestamp )
       RETURNING username, password, first_name, last_name, phone`,
-      [username, password, first_name, last_name, phone]
+      [username, hashedPassword, first_name, last_name, phone]
     )
     return result.rows[0]
   }
@@ -24,13 +27,13 @@ class User {
   /** Authenticate: is this username/password valid? Returns boolean. */
 
   static async authenticate( username, password ) {
-    const result = await db.query(`
+    const user = await db.query(`
       SELECT username, password 
       FROM users 
       WHERE username = $1`,
       [username]
     )
-    if (result && result.rows[0].password === password) {
+    if (user && await bcrypt.compare(password, user.rows[0].password)) {
       return true
     } else {
       return false
@@ -40,12 +43,14 @@ class User {
   /** Update last_login_at for user */
 
   static async updateLoginTimestamp(username) {
-    await db.query(`
+    const result = await db.query(`
       UPDATE users
       SET last_login_at = current_timestamp
-      WHERE username = $1`,
+      WHERE username = $1
+      RETURNING username`,
       [username]
     )
+    if (!result.rows[0]) throw new ExpressError(`User: ${username} not found.`, 404)
   }
 
   /** All: basic info on all users:
@@ -74,6 +79,7 @@ class User {
       WHERE username = $1`,
       [username]
     )
+    if (!result.rows[0]) throw new ExpressError(`User: ${username} not found.`, 404)
     return result.rows[0]
   }
 
